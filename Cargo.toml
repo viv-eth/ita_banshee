@@ -1,0 +1,6 @@
+[package]
+name = "softmax"
+version = "0.1.0"
+authors = ["viv-eth <vivianep@ethz.ch>"]
+
+[dependencies]
