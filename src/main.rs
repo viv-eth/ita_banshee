@@ -46,9 +46,6 @@ fn main() {
 
     // temporary matrices
     let mut A_temp = Array1::<i32>::zeros((64 * 64));
-    let mut Q_temp = Array1::<i8>::zeros((64 * 64));
-    let mut W_q_temp = Array1::<i8>::zeros((1 * 64 * 64));
-    let mut B_q_temp = Array1::<i8>::zeros((1 * 64 * 64));
 
     // Init A_requant with random numbers
     // for i in 0..64 {
@@ -79,77 +76,11 @@ fn main() {
         }
     }
 
-    
-
-    // let mut Q_buf = vec![]; 
-    // std::fs::File::open("/scratch/vivianep/ita_mempool/ita/Python_model/Q_matrix.npy").unwrap()
-    //     .read_to_end(&mut Q_buf).unwrap();
-
-    // // let Q_data: NpyData<i8> = NpyData::from_bytes(&Q_buf).unwrap();
-    // let Q_matrix: NpyData<i64> = NpyData::from_bytes(&Q_buf).unwrap();
-
-    // // convert Q_matrix to i8
-    // let mut Q_cnt = 0;
-    // for number in Q_matrix {
-    //     Q_temp[Q_cnt] = number as i8;
-    //     Q_cnt += 1;
-    // }
-
-    // // instantiate Q with data from Q_temp
-    // for i in 0..Q.shape()[0] {
-    //     for j in 0..Q.shape()[1] {
-    //         Q[[i, j]] = Q_temp[i * 64 + j]
-    //     }
-    // }
-
     init2D_matrix(&mut Q, "/scratch/vivianep/ita_mempool/ita/Python_model/Q_matrix.npy");
 
-    println!("Q: {:?}", Q);
+    init3D_matrix(&mut W_q, "/scratch/vivianep/ita_mempool/ita/Python_model/Wq_matrix.npy");
 
-    let mut W_q_buf = vec![];
-    std::fs::File::open("/scratch/vivianep/ita_mempool/ita/Python_model/Wq_matrix.npy").unwrap()
-        .read_to_end(&mut W_q_buf).unwrap();
-
-    let W_q_matrix: NpyData<i64> = NpyData::from_bytes(&W_q_buf).unwrap();
-
-    let mut W_q_cnt = 0;
-
-    for number in W_q_matrix {
-        W_q_temp[W_q_cnt] = number as i8;
-        W_q_cnt += 1;
-    }
-
-    // instantiate W_q with data from W_q_temp
-    for i in 0..W_q.shape()[0] {
-        for j in 0..W_q.shape()[1] {
-            for k in 0..W_q.shape()[2] {
-                W_q[[i, j, k]] = W_q_temp[i * 64 * 64 + j * 64 + k];
-            }
-        }
-    }
-
-    let mut B_q_buf = vec![];
-
-    std::fs::File::open("/scratch/vivianep/ita_mempool/ita/Python_model/Bq_matrix.npy").unwrap()
-        .read_to_end(&mut B_q_buf).unwrap();
-
-    let B_q_matrix: NpyData<i64> = NpyData::from_bytes(&B_q_buf).unwrap();
-
-    let mut B_q_cnt = 0;
-
-    for number in B_q_matrix {
-        B_q_temp[B_q_cnt] = number as i8;
-        B_q_cnt += 1;
-    }
-
-    // instantiate B_q with data from B_q_temp
-    for i in 0..B_q.shape()[0] {
-        for j in 0..B_q.shape()[1] {
-            for k in 0..B_q.shape()[2] {
-                B_q[[i, j, k]] = B_q_temp[i * 64 * 64 + j * 64 + k];
-            }
-        }
-    }
+    init3D_matrix(&mut B_q, "/scratch/vivianep/ita_mempool/ita/Python_model/Bq_matrix.npy");
 
     println!("W_q: {}", W_q);
     println!("B_q: {}", B_q);

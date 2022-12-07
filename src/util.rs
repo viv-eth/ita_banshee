@@ -52,8 +52,8 @@ pub fn init3D_matrix<T: npy::Serializable + Copy + 'static + AsPrimitive<T> + st
     // get dimensions of M
     let m_shape = M.shape();
 
-    let m_dim1 = m_shape[0];
-    let m_dim2 = m_shape[1];
+    let m_dim1 = m_shape[1];
+    let m_dim2 = m_shape[2];
 
     // write data in M
     for (i, number) in M_data.into_iter().enumerate() {
