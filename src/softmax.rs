@@ -5,27 +5,57 @@ use ndarray:: {
     Array1,
     Array2,
     Array3,
+    linalg::general_mat_mul,
 };
 
-pub fn projection_space_projection(Q: &mut Array2<i8>, W_q: &mut Array3<i8>, B_q: &mut Array3<i8>, bias: u8) {
+// NOTE: At the moment also the bias matrix is given 
+// as input, but it should be initialized with random
+// numbers in the future. 
+// TODO: Initialize bias matrix with random numbers
+pub fn query_projection_space_transformation(Q_p: &mut Array3<i32>, Q: &mut Array2<i8>, W_q: &mut Array3<i8>, B_q: &mut Array3<i8>, bias: u8) {
+
+    println!("===================== Query Projection Space Transformation =====================");
 
     if bias == 1 {
-        for i in 0..64 {
-            for j in 0..64 {
-                Q[[i, j]] = W_q[[0, i, j]] + B_q[[0, i, j]];
+
+        for i in 0..Q_p.shape()[0] {
+            // Loop over the number of heads
+            for j in 0..Q_p.shape()[1] {
+                // Loop over the number of queries
+                for k in 0..Q_p.shape()[2] {
+                    Q_p[[i, j, k]] = B_q[[i, j, k]] as i32;
+                    // Loop over the number of features
+                    for l in 0..Q.shape()[1] {
+                        Q_p[[i, j, k]] += Q[[j, l]] as i32 * W_q[[i, l, k]] as i32;
+                    }
+                }
             }
         }
+        
     } else {
-        for i in 0..64 {
-            for j in 0..64 {
-                Q[[i, j]] = W_q[[0, i, j]];
+        // Loop over the number of heads
+        for i in 0..Q_p.shape()[0] {
+            // Loop over the number of queries
+            for j in 0..Q_p.shape()[1] {
+                // Loop over the number of keys
+                for k in 0..Q_p.shape()[2] {
+                    Q_p[[i, j, k]] = 0;
+                    // Loop over the number of features
+                    for l in 0..Q.shape()[1] {
+                        Q_p[[i, j, k]] += Q[[j, l]] as i32 * W_q[[i, l, k]] as i32;
+                    }
+                }
             }
         }
     }
+
+    println!("Q_p: {:?}", Q_p);
 }
 
 //Compute the approximated softmax function.
 pub fn streaming_partial_softmax(A_requant: &mut Array2<i32>, A_partial_softmax: &mut Array2<i32>, seq_len: i32) {
+
+    println!("===================== Streaming Partial SoftMax =====================");
     
     let log2e: f64 = f64::log2(f64::exp(1.0));
     let x = Array::linspace(-255f32, 0.0, 256);
