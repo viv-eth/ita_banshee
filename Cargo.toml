@@ -4,3 +4,8 @@ version = "0.1.0"
 authors = ["viv-eth <vivianep@ethz.ch>"]
 
 [dependencies]
+ndarray = "0.13"
+rand = "0.8.5"
+round = "0.1.2"
+npy = "0.4.0"
+npy-derive = "0.4"
