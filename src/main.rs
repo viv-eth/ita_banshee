@@ -21,8 +21,11 @@ use rand::Rng;
 mod softmax;
 use softmax::
 {
-    streaming_partial_softmax,
+    requantization_3d,
     query_projection_space_transformation,
+    key_projection_space_transformation,
+    query_key_correlation,
+    streaming_partial_softmax,
 };
 
 mod util;
@@ -33,68 +36,65 @@ use util::
 };
 
 fn main() {
-
-    // matrices in the streaming_partial_softmax
-    let mut A_requant = Array2::<i32>::zeros((64, 64));
-    let mut A_partial_softmax = Array2::<i32>::zeros((64, 64));
+    
+    // Setup of matrices for query_projection_space_transformation and key_projection_space_transformation
     let mut Q = Array2::<i8>::zeros((64, 64));
+    init2D_matrix(&mut Q, "/scratch/vivianep/ita_mempool/ita/Python_model/Q_matrix.npy");
     let mut W_q = Array3::<i8>::zeros((1, 64, 64));
+    init3D_matrix(&mut W_q, "/scratch/vivianep/ita_mempool/ita/Python_model/Wq_matrix.npy");
+    
+    let mut K = Array2::<i8>::zeros((64, 64));
+    init2D_matrix(&mut K, "/scratch/vivianep/ita_mempool/ita/Python_model/K_matrix.npy");
+    let mut W_k = Array3::<i8>::zeros((1, 64, 64));
+    init3D_matrix(&mut W_k, "/scratch/vivianep/ita_mempool/ita/Python_model/Wk_matrix.npy");
     
     // matrices in the query_projection_space_transformation
     let mut B_q = Array3::<i8>::zeros((1, 64, 64));
-    let mut Q_p = Array3::<i32>::zeros((1, 64, 64));
-
-    // temporary matrices
-    let mut A_temp = Array1::<i32>::zeros((64 * 64));
-
-    // Init A_requant with random numbers
-    // for i in 0..64 {
-    //     for j in 0..64 {
-    //         A_requant[[i, j]] = rand::thread_rng().gen_range(-128..127);
-    //     }
-    // }
-
-    let mut A_requant_buf = vec![]; 
-    std::fs::File::open("/scratch/vivianep/ita_mempool/ita/Python_model/A_requant.npy").unwrap()
-        .read_to_end(&mut A_requant_buf).unwrap();
-    
-    let A_requant_matrix: NpyData<i32> = NpyData::from_bytes(&A_requant_buf).unwrap();
-
-    // let A_requant_matrix: NpyData<i64> = NpyData::from_bytes(&buf).unwrap();
-
-    let mut cnt = 0;
-
-    for number in A_requant_matrix {
-        A_temp[cnt] = number as i32;
-        cnt += 1;
-    }
-
-    // instantiate A_requant with data from A_temp
-    for i in 0..A_requant.shape()[0] {
-        for j in 0..A_requant.shape()[1] {
-            A_requant[[i, j]] = A_temp[i * 64 + j];
-        }
-    }
-
-    init2D_matrix(&mut Q, "/scratch/vivianep/ita_mempool/ita/Python_model/Q_matrix.npy");
-
-    init3D_matrix(&mut W_q, "/scratch/vivianep/ita_mempool/ita/Python_model/Wq_matrix.npy");
-
     init3D_matrix(&mut B_q, "/scratch/vivianep/ita_mempool/ita/Python_model/Bq_matrix.npy");
+    let mut Q_p = Array3::<i32>::zeros((1, 64, 64));
+    
+    
+    // matrices in the key_projection_space_transformation
+    let mut B_k = Array3::<i8>::zeros((1, 64, 64));
+    init3D_matrix(&mut B_k, "/scratch/vivianep/ita_mempool/ita/Python_model/Bk_matrix.npy");
+    let mut K_p = Array3::<i32>::zeros((1, 64, 64));
 
+    // matrices in the streaming_partial_softmax
+    let mut A_requant = Array3::<i8>::zeros((1, 64, 64));
+    let mut A_partial_softmax = Array2::<i32>::zeros((64, 64));
+    
     println!("W_q: {}", W_q);
     println!("B_q: {}", B_q);
     println!("Q: {}", Q);
 
+    println!("W_k: {}", W_k);
+    println!("B_k: {}", B_k);
+    println!("K: {}", K);
+
+
+
+    // query_projection_space_transformation
     query_projection_space_transformation(&mut Q_p, &mut Q, &mut W_q, &mut B_q, 1);
-    
-    // streaming_partial_softmax(&mut A_requant, &mut A_partial_softmax, 64);
-    // println!("A_requant: {}", A_requant);
-    // println!("A_partial_softmax: {}", A_partial_softmax);
-    println!("A_partial_softmax shape: {:?}", A_partial_softmax.shape());
-    println!("Q shape: {:?}", Q.shape());
-    println!("W_q shape: {:?}", W_q.shape());
-    println!("B_q shape: {:?}", B_q.shape());
-    println!("Hello, world!");
-    // println!("cnt: {}", cnt);
+    // requantization of Q_p
+    let mut Q_p_requant = Array3::<i8>::zeros((1, 64, 64));
+    requantization_3d(&mut Q_p, &mut Q_p_requant, 52, 14);
+    println!("Q_p_requant: {}", Q_p_requant);
+
+    // key_projection_space_transformation
+    key_projection_space_transformation(&mut K_p, &mut K, &mut W_k, &mut B_k, 1);
+    // requantization of K_p
+    let mut K_p_requant = Array3::<i8>::zeros((1, 64, 64));
+    requantization_3d(&mut K_p, &mut K_p_requant, 66, 14);
+    println!("K_p_requant: {}", K_p_requant);
+
+    // query_key_correlation
+    let mut QK = Array3::<i32>::zeros((1, 64, 64));
+    query_key_correlation(&mut Q_p_requant, &mut K_p_requant, &mut QK);
+    // requantization of QK
+    requantization_3d(&mut QK, &mut A_requant, 19, 14);
+    println!("A_requant: {}", A_requant);
+
+    // streaming_partial_softmax
+    streaming_partial_softmax(&mut A_requant, &mut A_partial_softmax, 64);
+
 }
