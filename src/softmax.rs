@@ -121,6 +121,46 @@ pub fn key_projection_space_transformation(K_p: &mut Array3<i32>, K: &mut Array2
     println!("K_p: {:?}", K_p);
 }
 
+pub fn value_projection_space_transformation(V_p: &mut Array3<i32>, V: &mut Array2<i8>, W_v: &mut Array3<i8>, B_v: &mut Array3<i8>, bias: u8) {
+
+    println!("===================== Value Projection Space Transformation =====================");
+
+    if bias == 1 {
+
+        for i in 0..V_p.shape()[0] {
+            // Loop over the number of heads
+            for j in 0..V_p.shape()[1] {
+                // Loop over the number of queries
+                for k in 0..V_p.shape()[2] {
+                    V_p[[i, j, k]] = B_v[[i, j, k]] as i32;
+                    // Loop over the number of features
+                    for l in 0..V.shape()[1] {
+                        V_p[[i, j, k]] += V[[j, l]] as i32 * W_v[[i, l, k]] as i32;
+                    }
+                }
+            }
+        }
+        
+    } else {
+        // Loop over the number of heads
+        for i in 0..V_p.shape()[0] {
+            // Loop over the number of queries
+            for j in 0..V_p.shape()[1] {
+                // Loop over the number of keys
+                for k in 0..V_p.shape()[2] {
+                    V_p[[i, j, k]] = 0;
+                    // Loop over the number of features
+                    for l in 0..V.shape()[1] {
+                        V_p[[i, j, k]] += V[[j, l]] as i32 * W_v[[i, l, k]] as i32;
+                    }
+                }
+            }
+        }
+    }
+
+    println!("V_p: {:?}", V_p);
+}
+
 pub fn query_key_correlation(Qp_requant: &mut Array3<i8>, Kp_requant: &mut Array3<i8>, QK: &mut Array3<i32>) {
 
     println!("===================== Query Key Correlation =====================");
@@ -210,4 +250,27 @@ pub fn streaming_partial_softmax(A_requant: &mut Array3<i8>, A_partial_softmax: 
     }
 
     println!("A_partial_softmax: {}", A_partial_softmax);
+}
+
+pub fn single_head_computation(A_partial_softmax: &mut Array2<i32>, Vp_requant: &mut Array3<i8>, O_softmax: &mut Array3<i32>) {
+
+    println!("===================== Single Head Computation =====================");
+
+    // Loop over the number of heads
+    for i in 0..O_softmax.shape()[0] {
+        // Loop over the number of queries
+        for j in 0..O_softmax.shape()[1] {
+            // Loop over the number of keys
+            for k in 0..O_softmax.shape()[2] {
+                O_softmax[[i, j, k]] = 0;
+                // Loop over the number of features
+                for l in 0..O_softmax.shape()[1] {
+                    O_softmax[[i, j, k]] += A_partial_softmax[[j, l]] as i32 * Vp_requant[[i, l, k]] as i32;
+                }
+            }
+        }
+    }
+
+    println!("O_softmax: {:?}", O_softmax);
+    
 }
