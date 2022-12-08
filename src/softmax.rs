@@ -40,6 +40,34 @@ pub fn requantization_3d(M: &mut Array3<i32>, M_requant: &mut Array3<i8>, eps_mu
     // println!("Requantized matrix: {:?}", M_requant);
 }
 
+pub fn parallel_requantize3d(M: &mut Array3<i32>, M_requant: &mut Array2<i8>, eps_mult: i32, right_shift: i32) {
+
+    println!("===================== Parallel 3D Requantization =====================");
+
+    // Loop over the number of heads
+    for i in 0..M.shape()[0] {
+        // Loop over the head dimension
+        for j in 0..M.shape()[1] {
+            // print the column of the head matrix
+            let row = M.slice(s![i, j, ..]);
+            // Iterate over the row and requantize it
+            for k in 0..row.len() {
+                let shifted = (row[k] * eps_mult) >> right_shift + M_requant[[i * M.shape()[1] + j, k]] as i32;
+                if shifted > 127 {
+                    M_requant[[i * M.shape()[1] + j, k]] = 127;
+                } else if shifted < -128 {
+                    M_requant[[i * M.shape()[1] + j, k]] = -128;
+                } else {
+                    M_requant[[i * M.shape()[1] + j, k]] = shifted as i8;
+                }
+            }
+        }
+        
+    }
+
+    // println!("Requantized matrix: {:?}", M_requant);
+}
+
 // TODO: Initialize bias matrix with random numbers
 pub fn query_projection_space_transformation(Q_p: &mut Array3<i32>, Q: &mut Array2<i8>, W_q: &mut Array3<i8>, B_q: &mut Array3<i8>, bias: u8) {
 
@@ -273,4 +301,36 @@ pub fn single_head_computation(A_partial_softmax: &mut Array2<i32>, Vp_requant: 
 
     println!("O_softmax: {:?}", O_softmax);
     
+}
+
+pub fn multi_head_computation(O_softmax_requant: &mut Array3<i8>, out: &mut Array3<i32>, W_o: &mut Array3<i8>, B_o: &mut Array3<i8>, bias: u8) {
+
+    println!("===================== Multi Head Computation =====================");
+
+    if bias == 1 {
+        for i in 0..out.shape()[0] {
+            for j in 0..out.shape()[1] {
+                for k in 0..out.shape()[2] {
+                    out[[i, j, k]] = B_o[[i, j, k]] as i32;
+                    for l in 0..out.shape()[1] {
+                        out[[i, j, k]] += O_softmax_requant[[i, j, l]] as i32 * W_o[[i, l, k]] as i32;
+                    }
+                }
+            }
+        }
+    } else {
+        for i in 0..out.shape()[0] {
+            for j in 0..out.shape()[1] {
+                for k in 0..out.shape()[2] {
+                    out[[i, j, k]] = 0;
+                    for l in 0..out.shape()[1] {
+                        out[[i, j, k]] += O_softmax_requant[[i, j, l]] as i32 * W_o[[i, l, k]] as i32;
+                    }
+                }
+            }
+        }
+    }
+    
+
+    println!("out: {:?}", out);
 }

@@ -22,12 +22,14 @@ mod softmax;
 use softmax::
 {
     requantization_3d,
+    parallel_requantize3d,
     query_projection_space_transformation,
     key_projection_space_transformation,
     value_projection_space_transformation,
     query_key_correlation,
     streaming_partial_softmax,
     single_head_computation,
+    multi_head_computation,
 };
 
 mod util;
@@ -73,15 +75,12 @@ fn main() {
     let mut A_requant = Array3::<i8>::zeros((1, 64, 64));
     let mut A_partial_softmax = Array2::<i32>::zeros((64, 64));
 
-    
-    println!("W_q: {}", W_q);
-    println!("B_q: {}", B_q);
-    println!("Q: {}", Q);
-
-    println!("W_k: {}", W_k);
-    println!("B_k: {}", B_k);
-    println!("K: {}", K);
-
+    // matrices in multi_head_computation
+    let mut out = Array3::<i32>::zeros((1, 64, 64));
+    let mut B_o = Array3::<i8>::zeros((1, 64, 64));
+    init3D_matrix(&mut B_o, "/scratch/vivianep/ita_mempool/ita/Python_model/Bo_matrix.npy");
+    let mut W_o = Array3::<i8>::zeros((1, 64, 64));
+    init3D_matrix(&mut W_o, "/scratch/vivianep/ita_mempool/ita/Python_model/Wo_matrix.npy");
 
 
     // query_projection_space_transformation
@@ -122,5 +121,12 @@ fn main() {
     let mut O_softmax_requant = Array3::<i8>::zeros((1, 64, 64));
     requantization_3d(&mut O_softmax, &mut O_softmax_requant, 76, 14);
     println!("O_softmax_requant: {}", O_softmax_requant);
+
+    // multi_head_computation
+    multi_head_computation(&mut O_softmax_requant, &mut out, &mut W_o, &mut B_o, 1);
+    // parallel requantization of out
+    let mut out_requant = Array2::<i8>::zeros((64, 64));
+    parallel_requantize3d(&mut out, &mut out_requant, 6, 14);
+    println!("out_requant: {}", out_requant);
 
 }
