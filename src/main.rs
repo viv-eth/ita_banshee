@@ -8,9 +8,9 @@ use ndarray::{prelude::*, Array2};
 
 mod softmax;
 use softmax::{
-    key_projection_space_transformation, multi_head_computation, parallel_requantize3d,
-    query_key_correlation, query_projection_space_transformation, requantization_3d,
-    single_head_computation, streaming_partial_softmax, value_projection_space_transformation,
+    projection_space_transformation, multi_head_computation, parallel_requantize3d,
+    query_key_correlation, requantization_3d,
+    single_head_computation, streaming_partial_softmax,
 };
 
 mod util;
@@ -21,36 +21,36 @@ fn main() {
     let mut q = Array2::<i8>::zeros((64, 64));
     init2D_matrix(
         &mut q,
-        "/scratch/vivianep/ita_mempool/ita/Python_model/Q_matrix.npy",
+        "/scratch/vivianep/ita_mempool/ita/Python_model/matrices/Q_matrix.npy",
     );
     let mut w_q = Array3::<i8>::zeros((1, 64, 64));
     init3D_matrix(
         &mut w_q,
-        "/scratch/vivianep/ita_mempool/ita/Python_model/Wq_matrix.npy",
+        "/scratch/vivianep/ita_mempool/ita/Python_model/matrices/Wq_matrix.npy",
     );
 
     let mut k = Array2::<i8>::zeros((64, 64));
     init2D_matrix(
         &mut k,
-        "/scratch/vivianep/ita_mempool/ita/Python_model/K_matrix.npy",
+        "/scratch/vivianep/ita_mempool/ita/Python_model/matrices/K_matrix.npy",
     );
     let mut w_k = Array3::<i8>::zeros((1, 64, 64));
     init3D_matrix(
         &mut w_k,
-        "/scratch/vivianep/ita_mempool/ita/Python_model/Wk_matrix.npy",
+        "/scratch/vivianep/ita_mempool/ita/Python_model/matrices/Wk_matrix.npy",
     );
 
     // Setup of matrices for value_projection_space_transformation
     let mut b_v = Array3::<i8>::zeros((1, 64, 64));
     init3D_matrix(
         &mut b_v,
-        "/scratch/vivianep/ita_mempool/ita/Python_model/Bv_matrix.npy",
+        "/scratch/vivianep/ita_mempool/ita/Python_model/matrices/Bv_matrix.npy",
     );
     let mut v = k.clone();
     let mut w_v = Array3::<i8>::zeros((1, 64, 64));
     init3D_matrix(
         &mut w_v,
-        "/scratch/vivianep/ita_mempool/ita/Python_model/Wv_matrix.npy",
+        "/scratch/vivianep/ita_mempool/ita/Python_model/matrices/Wv_matrix.npy",
     );
     let mut v_p = Array3::<i32>::zeros((1, 64, 64));
 
@@ -58,7 +58,7 @@ fn main() {
     let mut b_q = Array3::<i8>::zeros((1, 64, 64));
     init3D_matrix(
         &mut b_q,
-        "/scratch/vivianep/ita_mempool/ita/Python_model/Bq_matrix.npy",
+        "/scratch/vivianep/ita_mempool/ita/Python_model/matrices/Bq_matrix.npy",
     );
     let mut q_p = Array3::<i32>::zeros((1, 64, 64));
 
@@ -66,7 +66,7 @@ fn main() {
     let mut b_k = Array3::<i8>::zeros((1, 64, 64));
     init3D_matrix(
         &mut b_k,
-        "/scratch/vivianep/ita_mempool/ita/Python_model/Bk_matrix.npy",
+        "/scratch/vivianep/ita_mempool/ita/Python_model/matrices/Bk_matrix.npy",
     );
     let mut k_p = Array3::<i32>::zeros((1, 64, 64));
 
@@ -79,23 +79,25 @@ fn main() {
     let mut b_o = Array3::<i8>::zeros((1, 64, 64));
     init3D_matrix(
         &mut b_o,
-        "/scratch/vivianep/ita_mempool/ita/Python_model/Bo_matrix.npy",
+        "/scratch/vivianep/ita_mempool/ita/Python_model/matrices/Bo_matrix.npy",
     );
     let mut w_o = Array3::<i8>::zeros((1, 64, 64));
     init3D_matrix(
         &mut w_o,
-        "/scratch/vivianep/ita_mempool/ita/Python_model/Wo_matrix.npy",
+        "/scratch/vivianep/ita_mempool/ita/Python_model/matrices/Wo_matrix.npy",
     );
 
     // query_projection_space_transformation
-    query_projection_space_transformation(&mut q_p, &mut q, &mut w_q, &mut b_q, 1);
+    // query_projection_space_transformation(&mut q_p, &mut q, &mut w_q, &mut b_q, 1);
+    projection_space_transformation(&mut q_p, &mut q, &mut w_q, &mut b_q, 1);
     // requantization of q_p
     let mut q_p_requant = Array3::<i8>::zeros((1, 64, 64));
     requantization_3d(&mut q_p, &mut q_p_requant, 52, 14);
     println!("q_p_requant: {}", q_p_requant);
 
     // key_projection_space_transformation
-    key_projection_space_transformation(&mut k_p, &mut k, &mut w_k, &mut b_k, 1);
+    // key_projection_space_transformation(&mut k_p, &mut k, &mut w_k, &mut b_k, 1);
+    projection_space_transformation(&mut k_p, &mut k, &mut w_k, &mut b_k, 1);
     // requantization of k_p
     let mut k_p_requant = Array3::<i8>::zeros((1, 64, 64));
     requantization_3d(&mut k_p, &mut k_p_requant, 66, 14);
@@ -112,7 +114,8 @@ fn main() {
     streaming_partial_softmax(&mut a_requant, &mut a_partial_softmax, 64);
 
     // value_projection_space_transformation
-    value_projection_space_transformation(&mut v_p, &mut v, &mut w_v, &mut b_v, 1);
+    // value_projection_space_transformation(&mut v_p, &mut v, &mut w_v, &mut b_v, 1);
+    projection_space_transformation(&mut v_p, &mut v, &mut w_v, &mut b_v, 1);
     // requantization of v_p
     let mut v_p_requant = Array3::<i8>::zeros((1, 64, 64));
     requantization_3d(&mut v_p, &mut v_p_requant, 54, 14);

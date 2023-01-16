@@ -4,6 +4,17 @@ use ndarray::{s, Array1, Array2, Array3};
 // as input, but it should be initialized with random
 // numbers in the future.
 
+fn requantize_row(element: i32, eps_mult: i32, right_shift: i32) -> i8 {
+    let shifted = (element * eps_mult) >> right_shift;
+    if shifted > 127 {
+        return 127;
+    } else if shifted < -128 {
+        return -128;
+    } else {
+        return shifted as i8;
+    }
+}
+
 pub fn requantization_3d(
     m: &mut Array3<i32>,
     m_requant: &mut Array3<i8>,
@@ -20,14 +31,7 @@ pub fn requantization_3d(
             let row = m.slice(s![i, j, ..]);
             // Iterate over the row and requantize it
             for k in 0..row.len() {
-                let shifted = (row[k] * eps_mult) >> right_shift;
-                if shifted > 127 {
-                    m_requant[[i, j, k]] = 127;
-                } else if shifted < -128 {
-                    m_requant[[i, j, k]] = -128;
-                } else {
-                    m_requant[[i, j, k]] = shifted as i8;
-                }
+                m_requant[[i, j, k]] = requantize_row(row[k], eps_mult, right_shift);
             }
         }
     }
@@ -43,158 +47,51 @@ pub fn parallel_requantize3d(
 ) {
     println!("===================== Parallel 3D Requantization =====================");
 
-    // Loop over the number of heads
     for i in 0..m.shape()[0] {
-        // Loop over the head dimension
         for j in 0..m.shape()[1] {
-            // print the column of the head matrix
             let row = m.slice(s![i, j, ..]);
-            // Iterate over the row and requantize it
             for k in 0..row.len() {
-                let shifted = (row[k] * eps_mult)
-                    >> right_shift + m_requant[[i * m.shape()[1] + j, k]] as i32;
-                if shifted > 127 {
-                    m_requant[[i * m.shape()[1] + j, k]] = 127;
-                } else if shifted < -128 {
-                    m_requant[[i * m.shape()[1] + j, k]] = -128;
-                } else {
-                    m_requant[[i * m.shape()[1] + j, k]] = shifted as i8;
-                }
+                let shifted = requantize_row(row[k], eps_mult, right_shift) as i32 + m_requant[[i * m.shape()[1] + j, k]] as i32;
+                m_requant[[i * m.shape()[1] + j, k]] = requantize_row(shifted, 1, 0);
             }
         }
     }
-
-    // println!("Requantized matrix: {:?}", m_requant);
 }
 
 // TODO: Initialize bias matrix with random numbers
-pub fn query_projection_space_transformation(
-    q_p: &mut Array3<i32>,
-    q: &mut Array2<i8>,
-    w_q: &mut Array3<i8>,
-    b_q: &mut Array3<i8>,
+pub fn projection_space_transformation(
+    p: &mut Array3<i32>,
+    m: &mut Array2<i8>,
+    w: &mut Array3<i8>,
+    b: &mut Array3<i8>,
     bias: u8,
 ) {
-    println!("===================== Query Projection Space Transformation =====================");
-
+    println!("===================== Projection Space Transformation =====================");
     if bias == 1 {
-        for i in 0..q_p.shape()[0] {
-            // Loop over the number of heads
-            for j in 0..q_p.shape()[1] {
-                // Loop over the number of queries
-                for k in 0..q_p.shape()[2] {
-                    q_p[[i, j, k]] = b_q[[i, j, k]] as i32;
-                    // Loop over the number of features
-                    for l in 0..q.shape()[1] {
-                        q_p[[i, j, k]] += q[[j, l]] as i32 * w_q[[i, l, k]] as i32;
+        for i in 0..p.shape()[0] {
+            for j in 0..p.shape()[1] {
+                for k in 0..p.shape()[2] {
+                    p[[i, j, k]] = b[[i, j, k]] as i32;
+                    for l in 0..m.shape()[1] {
+                        p[[i, j, k]] += m[[j, l]] as i32 * w[[i, l, k]] as i32;
                     }
                 }
             }
         }
     } else {
-        // Loop over the number of heads
-        for i in 0..q_p.shape()[0] {
-            // Loop over the number of queries
-            for j in 0..q_p.shape()[1] {
-                // Loop over the number of keys
-                for k in 0..q_p.shape()[2] {
-                    q_p[[i, j, k]] = 0;
-                    // Loop over the number of features
-                    for l in 0..q.shape()[1] {
-                        q_p[[i, j, k]] += q[[j, l]] as i32 * w_q[[i, l, k]] as i32;
+        for i in 0..p.shape()[0] {
+            for j in 0..p.shape()[1] {
+                for k in 0..p.shape()[2] {
+                    p[[i, j, k]] = 0;
+                    for l in 0..m.shape()[1] {
+                        p[[i, j, k]] += m[[j, l]] as i32 * w[[i, l, k]] as i32;
                     }
                 }
             }
         }
     }
 
-    println!("q_p: {:?}", q_p);
-}
-
-pub fn key_projection_space_transformation(
-    k_p: &mut Array3<i32>,
-    km: &mut Array2<i8>,
-    w_k: &mut Array3<i8>,
-    b_k: &mut Array3<i8>,
-    bias: u8,
-) {
-    println!("===================== Key Projection Space Transformation =====================");
-
-    if bias == 1 {
-        for i in 0..k_p.shape()[0] {
-            // Loop over the number of heads
-            for j in 0..k_p.shape()[1] {
-                // Loop over the number of queries
-                for k in 0..k_p.shape()[2] {
-                    k_p[[i, j, k]] = b_k[[i, j, k]] as i32;
-                    // Loop over the number of features
-                    for l in 0..km.shape()[1] {
-                        k_p[[i, j, k]] += km[[j, l]] as i32 * w_k[[i, l, k]] as i32;
-                    }
-                }
-            }
-        }
-    } else {
-        // Loop over the number of heads
-        for i in 0..k_p.shape()[0] {
-            // Loop over the number of queries
-            for j in 0..k_p.shape()[1] {
-                // Loop over the number of keys
-                for k in 0..k_p.shape()[2] {
-                    k_p[[i, j, k]] = 0;
-                    // Loop over the number of features
-                    for l in 0..km.shape()[1] {
-                        k_p[[i, j, k]] += km[[j, l]] as i32 * w_k[[i, l, k]] as i32;
-                    }
-                }
-            }
-        }
-    }
-
-    println!("k_p: {:?}", k_p);
-}
-
-pub fn value_projection_space_transformation(
-    v_p: &mut Array3<i32>,
-    v: &mut Array2<i8>,
-    w_v: &mut Array3<i8>,
-    b_v: &mut Array3<i8>,
-    bias: u8,
-) {
-    println!("===================== Value Projection Space Transformation =====================");
-
-    if bias == 1 {
-        for i in 0..v_p.shape()[0] {
-            // Loop over the number of heads
-            for j in 0..v_p.shape()[1] {
-                // Loop over the number of queries
-                for k in 0..v_p.shape()[2] {
-                    v_p[[i, j, k]] = b_v[[i, j, k]] as i32;
-                    // Loop over the number of features
-                    for l in 0..v.shape()[1] {
-                        v_p[[i, j, k]] += v[[j, l]] as i32 * w_v[[i, l, k]] as i32;
-                    }
-                }
-            }
-        }
-    } else {
-        // Loop over the number of heads
-        for i in 0..v_p.shape()[0] {
-            // Loop over the number of queries
-            for j in 0..v_p.shape()[1] {
-                // Loop over the number of keys
-                for k in 0..v_p.shape()[2] {
-                    v_p[[i, j, k]] = 0;
-                    // Loop over the number of features
-                    for l in 0..v.shape()[1] {
-                        v_p[[i, j, k]] += v[[j, l]] as i32 * w_v[[i, l, k]] as i32;
-                    }
-                }
-            }
-        }
-    }
-
-    println!("v_p: {:?}", v_p);
+    println!("projected matrix: {:?}", p);
 }
 
 pub fn query_key_correlation(
